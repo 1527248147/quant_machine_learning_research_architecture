@@ -1,0 +1,81 @@
+{
+  "data": {
+    "raw_ohlcv_dir": "C:/AI_STOCK/dataset/rq_ohlcv_yearly_parquet2005-2025",
+    "raw_factor_dir": "C:/AI_STOCK/dataset/alpha158_plus_fund_yearly_parquet",
+    "processed_dir": "data/processed",
+    "cache_dir": "data/cache"
+  },
+  "panel": {
+    "start_year": 2020,
+    "end_year": 2025,
+    "start_date": "2020-12-01",
+    "end_date": "2025-12-20"
+  },
+  "targets": [
+    {
+      "name": "return_c1c2"
+    }
+  ],
+  "model": {
+    "name": "lgbm_rank",
+    "params": {
+      "learning_rate": 0.02,
+      "max_depth": 8,
+      "num_leaves": 127,
+      "min_data_in_leaf": 2000,
+      "feature_fraction": 0.7,
+      "bagging_fraction": 0.7,
+      "bagging_freq": 1,
+      "lambda_l1": 0.0,
+      "lambda_l2": 10.0,
+      "min_gain_to_split": 0.02,
+      "truncation_level": 50,
+      "num_threads": 16
+    },
+    "label_roles": {
+      "regression": "return_c1c2"
+    },
+    "view": {
+      "exclude_pattern": "(?i)dividend",
+      "fund_features": [
+        "fund__pb_ratio_lyr",
+        "fund__book_to_market_ratio_lyr",
+        "fund__market_cap",
+        "fund__market_cap_3",
+        "fund__invested_capital_lf",
+        "fund__ev_lyr",
+        "fund__ev_lf",
+        "fund__market_cap_2",
+        "fund__inventory_turnover_ttm",
+        "fund__ev_no_cash_ttm",
+        "fund__inc_book_per_share_ttm",
+        "fund__invested_capital_lyr",
+        "fund__income_from_main_operations_lyr",
+        "fund__ep_ratio_ttm",
+        "fund__ev_ttm"
+      ]
+    }
+  },
+  "training": {
+    "seed": 42,
+    "split": {
+      "train_start": "2021-01-01",
+      "train_end": "2024-01-01",
+      "valid_start": "2024-01-01",
+      "valid_end": "2025-01-01",
+      "test_start": "2025-01-01",
+      "test_end": "2025-12-15"
+    },
+    "num_boost_round": 5000,
+    "early_stopping_rounds": 400,
+    "relevance_bins": 10,
+    "min_group_size": 30,
+    "missing_drop_thresh": 0.98,
+    "clip_y_abs": 0,
+    "exclude_regex": "(?i)dividend"
+  },
+  "evaluation": {
+    "run_test": true,
+    "refit_before_test": false
+  }
+}

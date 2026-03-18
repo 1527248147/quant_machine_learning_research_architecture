@@ -1,0 +1,2 @@
+best_iteration,train_rankic,valid_rankic,train_ir,valid_ir,train_time_s
+6,0.068230,0.057732,0.5493,0.3612,169.8

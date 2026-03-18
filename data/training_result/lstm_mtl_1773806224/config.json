@@ -1,0 +1,80 @@
+{
+  "data": {
+    "raw_ohlcv_dir": "C:/AI_STOCK/dataset/rq_ohlcv_yearly_parquet2005-2025",
+    "raw_factor_dir": "C:/AI_STOCK/dataset/alpha158_plus_fund_yearly_parquet",
+    "processed_dir": "data/processed",
+    "cache_dir": "data/cache"
+  },
+  "panel": {
+    "start_year": 2019,
+    "end_year": 2025,
+    "start_date": "2019-01-01",
+    "end_date": "2025-12-20"
+  },
+  "targets": [
+    {
+      "name": "return_c0c1"
+    },
+    {
+      "name": "momentum_cls"
+    }
+  ],
+  "model": {
+    "name": "lstm_mtl",
+    "params": {
+      "embed_dim": 128,
+      "hidden_size": 128,
+      "num_layers": 2,
+      "dropout": 0.2,
+      "num_classes": 5,
+      "use_layernorm": true,
+      "use_gating": true,
+      "gating_init_logit": 2.0
+    },
+    "label_roles": {
+      "regression": "return_c0c1",
+      "classification": "momentum_cls"
+    },
+    "view": {
+      "lookback": 60,
+      "k": 512,
+      "cross_sectional_norm": "none"
+    }
+  },
+  "training": {
+    "seed": 42,
+    "split": {
+      "train_start": "2019-01-01",
+      "train_end": "2022-01-01",
+      "valid_start": "2022-01-01",
+      "valid_end": "2024-01-01",
+      "test_start": "2024-01-01",
+      "test_end": "2025-12-15"
+    },
+    "epochs": 100,
+    "lr": 0.0002,
+    "weight_decay": 0.001,
+    "batch_size": 4,
+    "grad_clip": 1.0,
+    "patience": 10,
+    "amp": true,
+    "num_workers": 0,
+    "shuffle": true,
+    "log_interval": 200,
+    "use_lambdarank": false,
+    "lambdarank_k": 50,
+    "lambdarank_sigma": 1.0,
+    "lambdarank_bins": 5,
+    "ret_weight": 1.0,
+    "ce_weight": 1.0,
+    "gate_l1_max": 0.0005,
+    "gate_warmup_epochs": 5,
+    "gate_ramp_epochs": 20
+  },
+  "evaluation": {
+    "run_test": true,
+    "refit_before_test": false,
+    "refit_train_scope": "train+valid",
+    "refit_iteration_source": "selection"
+  }
+}
