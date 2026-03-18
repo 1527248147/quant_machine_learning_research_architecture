@@ -1,0 +1,127 @@
+# =============================================================================
+# LightGBM LambdaRank — Alpha158 + RiceQuant Financial Features
+# =============================================================================
+# 参考: project_alpha158+ricequant_fin+lgbm
+# 标签: return_c1c2 (Qlib 风格: close[t+1]→close[t+2], 即 P(t+2)/P(t+1)-1)
+
+# ---------------------------------------------------------------------------
+# Data paths
+# ---------------------------------------------------------------------------
+data:
+  raw_ohlcv_dir:   "C:/AI_STOCK/dataset/rq_ohlcv_yearly_parquet2005-2025"
+  raw_factor_dir:  "C:/AI_STOCK/dataset/alpha158_plus_fund_yearly_parquet"
+  processed_dir:   "data/processed"
+  cache_dir:       "data/cache"
+
+# ---------------------------------------------------------------------------
+# Year / date range
+# ---------------------------------------------------------------------------
+panel:
+  start_year:  2020
+  end_year:    2025
+  start_date:  "2020-12-01"
+  end_date:    "2025-12-20"
+
+# ---------------------------------------------------------------------------
+# Target
+# ---------------------------------------------------------------------------
+targets:
+  - name: "return_c1c2"          # Qlib 风格: close[t+1] → close[t+2]
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+model:
+  name: "lgbm_rank"
+
+  # LightGBM LambdaRank 参数
+  params:
+    learning_rate: 0.02
+    max_depth: 8
+    num_leaves: 127
+    min_data_in_leaf: 2000
+    feature_fraction: 0.7
+    bagging_fraction: 0.7
+    bagging_freq: 1
+    lambda_l1: 0.0
+    lambda_l2: 10.0
+    min_gain_to_split: 0.02
+    truncation_level: 50        # LambdaRank: 聚焦 top-50 排名
+    num_threads: 16
+
+  # 标签映射（ANY_SINGLE contract，只需一个回归标签）
+  label_roles:
+    regression: "return_c1c2"
+
+  # View 配置
+  view:
+    # 因子筛选: 排除 dividend 相关因子（预测力低）
+    exclude_pattern: "(?i)dividend"
+    # include_pattern: ""        # 留空 = 使用全部因子
+
+    # fund 因子白名单: 仅保留 permutation importance 筛选出的 top-15
+    # 全部 alpha158 因子自动保留，fund 因子仅保留以下列表中的
+    # 来源: feature_importance_valid_perm.csv (按 valid_rankic_drop_mean 降序)
+    fund_features:
+      - "fund__pb_ratio_lyr"                    # 市净率(上年) — drop=1.44%
+      - "fund__book_to_market_ratio_lyr"        # 账面市值比(上年) — drop=0.17%
+      - "fund__market_cap"                      # 总市值 — drop=0.14%
+      - "fund__market_cap_3"                    # 市值因子3 — drop=0.09%
+      - "fund__invested_capital_lf"             # 投入资本(最近财报) — drop=0.05%
+      - "fund__ev_lyr"                          # 企业价值(上年) — drop=0.04%
+      - "fund__ev_lf"                           # 企业价值(最近财报) — drop=0.04%
+      - "fund__market_cap_2"                    # 市值因子2 — drop=0.03%
+      - "fund__inventory_turnover_ttm"          # 存货周转率(TTM) — drop=0.01%
+      - "fund__ev_no_cash_ttm"                  # 企业价值(去现金,TTM) — drop=0.009%
+      - "fund__inc_book_per_share_ttm"          # 每股净资产增长(TTM) — drop=0.009%
+      - "fund__invested_capital_lyr"            # 投入资本(上年) — drop=0.008%
+      - "fund__income_from_main_operations_lyr" # 主营业务收入(上年) — drop=0.007%
+      - "fund__ep_ratio_ttm"                    # 盈利收益率(TTM) — drop=0.005%
+      - "fund__ev_ttm"                          # 企业价值(TTM) — drop=0.001%
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+training:
+  seed: 42
+
+  # 时间切分 —— [start, end) 左闭右开
+  split:
+    train_start: "2021-01-01"
+    train_end:   "2024-01-01"
+    valid_start: "2024-01-01"
+    valid_end:   "2025-01-01"
+    test_start:  "2025-01-01"
+    test_end:    "2025-12-15"
+
+  # LightGBM 训练参数
+  num_boost_round: 5000
+  early_stopping_rounds: 400
+
+  # 数据预处理
+  relevance_bins: 10            # 每日收益→10档相关性标签
+  min_group_size: 30            # 最少30只股票/天（否则跳过该交易日）
+  missing_drop_thresh: 0.98     # 缺失率>98%的因子被丢弃
+  clip_y_abs: 0                 # 标签截断（0=不截断）
+  exclude_regex: "(?i)dividend" # 排除 dividend 相关因子
+
+# ---------------------------------------------------------------------------
+# Evaluation
+# ---------------------------------------------------------------------------
+evaluation:
+  run_test: true
+  refit_before_test: false
+
+
+# 运行方式:
+# 1. 确保 panel_base 和 target 已构建（或用 run_pipeline）:
+#    python scripts/build_target.py --config configs/lgbm_alpha158_fund.yaml
+#
+# 2. 构建 view:
+#    python scripts/build_view.py --config configs/lgbm_alpha158_fund.yaml
+#
+# 3. 训练:
+#    python scripts/train.py --config configs/lgbm_alpha158_fund.yaml
+#
+# 或者一键运行:
+#    python scripts/run_pipeline.py --config configs/lgbm_alpha158_fund.yaml

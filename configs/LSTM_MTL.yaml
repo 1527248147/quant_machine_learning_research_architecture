@@ -1,0 +1,124 @@
+# =============================================================================
+# Quantitative Research Framework — Default Configuration
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Data paths
+# ---------------------------------------------------------------------------
+data:
+  raw_ohlcv_dir:   "C:/AI_STOCK/dataset/rq_ohlcv_yearly_parquet2005-2025"
+  raw_factor_dir:  "C:/AI_STOCK/dataset/alpha158_plus_fund_yearly_parquet"
+  processed_dir:   "data/processed"
+  cache_dir:       "data/cache"
+
+# ---------------------------------------------------------------------------
+# Year / date range
+# ---------------------------------------------------------------------------
+panel:
+  start_year:  2019
+  end_year:    2025
+  start_date:  "2019-01-01"
+  end_date:    "2025-12-20"
+
+# ---------------------------------------------------------------------------
+# Target (Phase 2+)
+# ---------------------------------------------------------------------------
+targets:
+  - name: "return_c0c1"        # 今日收盘 → 明日收盘（与参考模型一致）
+  - name: "momentum_cls"       # 5 类动量分类
+
+# ---------------------------------------------------------------------------
+# Model (Phase 3+)
+# ---------------------------------------------------------------------------
+model:
+  name: "lstm_mtl"
+
+  # 模型架构参数（怎么建模型，代码统一读 model.params）
+  params:
+    embed_dim: 128
+    hidden_size: 128
+    num_layers: 2
+    dropout: 0.2
+    num_classes: 5          # 动量五分类
+    use_layernorm: true
+    use_gating: true
+    gating_init_logit: 2.0
+
+  # 标签角色映射（ROLE_BASED contract）
+  label_roles:
+    regression: "return_c0c1"
+    classification: "momentum_cls"
+
+  # View 配置（memmap 构建 + 数据集采样参数）
+  view:
+    lookback: 60            # LSTM 回看窗口（交易日数）
+    k: 512                  # 每日采样股票数
+    cross_sectional_norm: "none"  # "none" / "rank" / "zscore"
+    # build_view 时的因子筛选（影响 memmap 内容，改了需要重建 view）
+    # include_pattern: "^feature\\.alpha158__"   # 只保留匹配的因子
+    # exclude_pattern: "^feature\\.fund__"       # 排除匹配的因子
+
+# ---------------------------------------------------------------------------
+# Training (Phase 3+)
+# ---------------------------------------------------------------------------
+training:
+  seed: 42
+
+  # 时间切分 —— 三段互不重叠，按日期左闭右开 [start, end)
+  split:
+    train_start: "2019-01-01"
+    train_end:   "2022-01-01"
+    valid_start: "2022-01-01"
+    valid_end:   "2024-01-01"
+    test_start:  "2024-01-01"
+    test_end:    "2025-12-15"
+
+  # 通用训练超参数
+  epochs: 100
+  lr: 2.0e-4
+  weight_decay: 1.0e-3
+  batch_size: 4
+  grad_clip: 1.0
+  patience: 10
+
+  # 性能 / 工程
+  amp: true                 # 混合精度（GPU 推荐开启）
+  num_workers: 0            # Windows 下设为 0（memmap 已足够快）
+  shuffle: true
+  log_interval: 200
+
+  # --- lstm_mtl 专属 (换模型时替换此区域) ---
+  # 回归损失选择: MSE (默认) 或 LambdaRank NDCG
+  use_lambdarank: false      # true → 用 LambdaRank 排序损失; false → 用 MSE 回归损失
+  lambdarank_k: 50           # LambdaRank: NDCG@k 的 k
+  lambdarank_sigma: 1.0      # LambdaRank: pairwise 差异缩放因子
+  lambdarank_bins: 5         # LambdaRank: 收益离散化分箱数
+  # 多任务损失权重
+  ret_weight: 1.0           # 回归损失权重（MSE 或 LambdaRank）
+  ce_weight: 1.0            # CE 分类损失权重
+  # Gating L1 正则化 schedule
+  gate_l1_max: 5.0e-4       # Gating L1 正则化上限
+  gate_warmup_epochs: 5     # gate 正则化预热 epoch
+  gate_ramp_epochs: 20      # gate 正则化线性增长 epoch
+  # 训练时的因子筛选（不影响 memmap，动态过滤，改了无需重建 view）
+  # include_pattern: "^feature\\.alpha158__"   # 只保留匹配的因子
+  # exclude_pattern: "^feature\\.fund__"       # 排除匹配的因子
+
+# ---------------------------------------------------------------------------
+# Evaluation (Phase 3+)
+# ---------------------------------------------------------------------------
+evaluation:
+  # 是否在 test 集上做最终评估
+  run_test: true
+
+  # 测试前是否用 train+valid 重训练（refit）
+  refit_before_test: false
+
+  # refit 数据范围: "train+valid"
+  refit_train_scope: "train+valid"
+
+  # refit 迭代次数来源: "selection" 表示使用 valid 上选出的最佳迭代次数
+  refit_iteration_source: "selection"
+
+
+# python scripts/run_pipeline.py --config configs/LSTM_MTL.yaml
